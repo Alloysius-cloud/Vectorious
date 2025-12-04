@@ -214,6 +214,7 @@ class Player {
             ctx.stroke();
 
             // Inner diamond
+            ctx.shadowColor = 'transparent';
             ctx.shadowBlur = 0;
             const hue = (Date.now() / 10) % 360; // Rainbow cycling
             ctx.strokeStyle = `hsl(${hue}, 100%, 70%)`;
@@ -243,16 +244,39 @@ class Player {
         if (this.beamData && this.beamData.length > 0) {
             ctx.save();
             ctx.translate(this.x, this.y);
-            ctx.strokeStyle = '#ff0'; // yellow beam
-            // Tier 3: thicker beams
-            ctx.lineWidth = this.powerupTiers.rapidFire === 3 ? 8 : 4;
+            const isTier3 = this.powerupTiers.rapidFire === 3;
+
             this.beamData.forEach(beam => {
                 ctx.save();
                 ctx.rotate(beam.angle);
+
+                // Layered stroke glow effect (no shadows)
+                // Outer glow layer
+                ctx.globalAlpha = 0.4;
+                ctx.strokeStyle = '#ff0';
+                ctx.lineWidth = isTier3 ? 12 : 8;
                 ctx.beginPath();
                 ctx.moveTo(0, 0);
                 ctx.lineTo(beam.length, 0);
                 ctx.stroke();
+
+                // Inner bright beam
+                ctx.globalAlpha = 0.8;
+                ctx.lineWidth = isTier3 ? 6 : 4;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(beam.length, 0);
+                ctx.stroke();
+
+                // Core white line
+                ctx.globalAlpha = 1;
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = isTier3 ? 2 : 1;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(beam.length, 0);
+                ctx.stroke();
+
                 ctx.restore();
             });
             ctx.restore();
@@ -347,12 +371,34 @@ class MiniShip {
         // Draw beam if active
         if (this.beamData) {
             ctx.rotate(this.beamData.angle);
-            ctx.strokeStyle = '#0ff'; // cyan beam
-            ctx.lineWidth = this.beamWidth;
+
+            // Layered stroke glow effect (no shadows)
+            // Outer glow layer
+            ctx.globalAlpha = 0.5;
+            ctx.strokeStyle = '#0ff';
+            ctx.lineWidth = this.beamWidth + 4;
             ctx.beginPath();
             ctx.moveTo(0, 0);
             ctx.lineTo(this.beamData.length, 0);
             ctx.stroke();
+
+            // Inner bright beam
+            ctx.globalAlpha = 0.8;
+            ctx.lineWidth = this.beamWidth + 1;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(this.beamData.length, 0);
+            ctx.stroke();
+
+            // Core white line
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = Math.max(1, this.beamWidth * 0.3);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(this.beamData.length, 0);
+            ctx.stroke();
+
             this.beamData = null; // Reset after drawing
         }
 

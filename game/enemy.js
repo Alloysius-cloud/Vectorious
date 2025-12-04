@@ -1,54 +1,18 @@
 class Enemy {
-    constructor(width, height) {
-        // Spawn from edges
-        const side = Math.floor(Math.random() * 4);
-        switch (side) {
-            case 0: // top
-                this.x = Math.random() * width;
-                this.y = -20;
-                break;
-            case 1: // right
-                this.x = width + 20;
-                this.y = Math.random() * height;
-                break;
-            case 2: // bottom
-                this.x = Math.random() * width;
-                this.y = height + 20;
-                break;
-            case 3: // left
-                this.x = -20;
-                this.y = Math.random() * height;
-                break;
-        }
+    constructor(x, y, type, config) {
+        this.x = x;
+        this.y = y;
 
         this.vx = (Math.random() - 0.5) * 2;
         this.vy = (Math.random() - 0.5) * 2;
         this.speed = 0.5 + Math.random() * 1.5;
 
-        // Enemy types with weighted spawning
-        const rand = Math.random();
-        if (rand < 0.6) {
-            // Blue Circle - 60% chance
-            this.type = 'circle';
-            this.maxHealth = 1;
-            this.size = 12;
-            this.color = '#0088ff';
-            this.points = 10;
-        } else if (rand < 0.85) {
-            // Red Square - 25% chance
-            this.type = 'square';
-            this.maxHealth = 2;
-            this.size = 16;
-            this.color = '#ff4444';
-            this.points = 25;
-        } else {
-            // Purple Hexagon - 15% chance
-            this.type = 'hexagon';
-            this.maxHealth = 5;
-            this.size = 20;
-            this.color = '#aa44ff';
-            this.points = 100;
-        }
+        // Set enemy properties from config
+        this.type = type;
+        this.maxHealth = config.maxHealth;
+        this.size = config.size;
+        this.color = config.color;
+        this.points = config.points;
 
         this.currentHealth = this.maxHealth;
     }
@@ -90,6 +54,10 @@ class Enemy {
         this.displayColor = healthRatio < 1 ? `hsl(${this.getHue(baseColor)}, 70%, ${30 + healthRatio * 40}%)` : this.color;
     }
 
+    isDead() {
+        return this.currentHealth <= 0;
+    }
+
     getHue(color) {
         // Extract hue from hex color for HSL manipulation
         const r = parseInt(color.slice(1, 3), 16) / 255;
@@ -110,27 +78,40 @@ class Enemy {
         ctx.translate(this.x, this.y);
 
         const color = this.displayColor || this.color;
+        const baseColor = this.color;
+
+        // Enemy-specific glow effects
+        let glowColor;
+        if (this.type === 'circle') {
+            glowColor = '#0088ff'; // Blue glow
+        } else if (this.type === 'square') {
+            glowColor = '#ff4444'; // Red glow
+        } else if (this.type === 'hexagon') {
+            glowColor = '#aa44ff'; // Purple glow
+        } else if (this.type === 'megaSquare') {
+            glowColor = '#00ff00'; // Green glow
+        }
+
+        // Layered stroke glow effect (no shadows needed)
+        // Outer glow layer
+        ctx.globalAlpha = 0.4;
+        ctx.strokeStyle = glowColor;
+        ctx.lineWidth = 6;
+        this.drawShape(ctx, this.size);
+        ctx.stroke();
+
+        // Middle glow layer
+        ctx.globalAlpha = 0.7;
+        ctx.lineWidth = 4;
+        this.drawShape(ctx, this.size);
+        ctx.stroke();
+
+        // Inner enemy shape
+        ctx.globalAlpha = 1;
         ctx.strokeStyle = color;
         ctx.lineWidth = 2;
-
-        if (this.type === 'circle') {
-            ctx.beginPath();
-            ctx.arc(0, 0, this.size, 0, Math.PI * 2);
-            ctx.stroke();
-        } else if (this.type === 'square') {
-            ctx.strokeRect(-this.size / 2, -this.size / 2, this.size, this.size);
-        } else if (this.type === 'hexagon') {
-            ctx.beginPath();
-            for (let i = 0; i < 6; i++) {
-                const angle = (i / 6) * Math.PI * 2;
-                const x = Math.cos(angle) * this.size;
-                const y = Math.sin(angle) * this.size;
-                if (i === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-            }
-            ctx.closePath();
-            ctx.stroke();
-        }
+        this.drawShape(ctx, this.size);
+        ctx.stroke();
 
         // Health bar for multi-hit enemies
         if (this.maxHealth > 1) {
@@ -156,5 +137,24 @@ class Enemy {
         }
 
         ctx.restore();
+    }
+
+    drawShape(ctx, size) {
+        if (this.type === 'circle') {
+            ctx.beginPath();
+            ctx.arc(0, 0, size, 0, Math.PI * 2);
+        } else if (this.type === 'square' || this.type === 'megaSquare') {
+            ctx.strokeRect(-size / 2, -size / 2, size, size);
+        } else if (this.type === 'hexagon') {
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const angle = (i / 6) * Math.PI * 2;
+                const x = Math.cos(angle) * size;
+                const y = Math.sin(angle) * size;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+        }
     }
 }
