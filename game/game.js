@@ -292,15 +292,25 @@ class Game {
 
         // Projectiles vs enemies
         this.projectiles.forEach(projectile => {
+            let projectileHit = false;
+            let bounced = false;
+
             this.enemies.forEach(enemy => {
+                if (projectileHit) return; // Skip if projectile already hit something
+
                 const dx = projectile.x - enemy.x;
                 const dy = projectile.y - enemy.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 if (dist < projectile.size + enemy.size) {
+                    projectileHit = true;
+
+                    // Check if enemy will die from this hit
+                    const enemyWillDie = enemy.currentHealth <= 1; // takeDamage() will reduce by 1
+
                     // Hit - damage enemy
                     enemy.takeDamage();
 
-                    if (enemy.currentHealth <= 0) {
+                    if (enemyWillDie && enemy.currentHealth <= 0) {
                         // Enemy destroyed
                         this.score += enemy.points;
                         this.totalKills++;
@@ -349,14 +359,14 @@ class Game {
                                 projectile.vx = Math.cos(newAngle) * speed;
                                 projectile.vy = Math.sin(newAngle) * speed;
                                 projectile.bouncesRemaining--;
-                                // Don't remove projectile - it continues
-                                return;
+                                bounced = true;
+                                return; // Exit enemy loop, projectile continues
                             }
                         }
                     }
 
-                    // Remove projectile if no bounce occurred
-                    if (!projectilesToRemove.includes(projectile)) {
+                    // Remove projectile if it hit but didn't bounce
+                    if (!bounced) {
                         projectilesToRemove.push(projectile);
                     }
                 }
@@ -365,6 +375,8 @@ class Game {
 
         // Beam vs enemies
         if (this.player.beamData && this.player.beamData.length > 0) {
+            const isTier3MultiShot = this.player.powerupTiers.multiShot === 3;
+
             this.player.beamData.forEach(beam => {
                 this.enemies.forEach(enemy => {
                     const dx = enemy.x - this.player.x;
