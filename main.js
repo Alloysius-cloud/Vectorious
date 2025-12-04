@@ -68,13 +68,18 @@ class App {
         const actions = ['up', 'down', 'left', 'right', 'shoot'];
         const labels = ['Up', 'Down', 'Left', 'Right', 'Shoot'];
 
+        this.selectedActionIndex = this.selectedActionIndex || 0;
+
         actions.forEach((action, index) => {
             const keyName = this.getKeyName(action);
-            this.ctx.fillText(`${index + 1}. ${labels[index]}: ${keyName}`, this.canvas.width / 2, 250 + index * 30);
+            const color = index === this.selectedActionIndex ? '#ff0' : '#fff';
+            this.ctx.fillStyle = color;
+            this.ctx.fillText(`${labels[index]}: ${keyName}`, this.canvas.width / 2, 250 + index * 30);
         });
 
-        this.ctx.fillText('Press 1-5 to select action to rebind', this.canvas.width / 2, 450);
-        this.ctx.fillText('Then press the new key', this.canvas.width / 2, 480);
+        this.ctx.fillStyle = '#fff';
+        this.ctx.fillText('Use up/down arrows to select action', this.canvas.width / 2, 450);
+        this.ctx.fillText('Press Enter to rebind, then press new key', this.canvas.width / 2, 480);
         this.ctx.fillText('Press ESC to return to title', this.canvas.width / 2, 520);
 
         // Options input handling
@@ -84,11 +89,19 @@ class App {
                 document.removeEventListener('keydown', optionsKeyHandler);
                 this.titleScreen.show();
             } else if (!this.rebindAction) {
-                // Select action to rebind
-                const num = parseInt(e.key);
-                if (num >= 1 && num <= 5) {
-                    this.rebindAction = actions[num - 1];
-                    this.ctx.fillText(`Press new key for ${labels[num - 1]}...`, this.canvas.width / 2, 550);
+                // Navigate actions
+                if (e.code === 'ArrowUp') {
+                    this.selectedActionIndex = Math.max(0, this.selectedActionIndex - 1);
+                    document.removeEventListener('keydown', optionsKeyHandler);
+                    this.showOptions();
+                } else if (e.code === 'ArrowDown') {
+                    this.selectedActionIndex = Math.min(4, this.selectedActionIndex + 1);
+                    document.removeEventListener('keydown', optionsKeyHandler);
+                    this.showOptions();
+                } else if (e.code === 'Enter') {
+                    this.rebindAction = actions[this.selectedActionIndex];
+                    this.ctx.fillStyle = '#ff0';
+                    this.ctx.fillText(`Press new key for ${labels[this.selectedActionIndex]}...`, this.canvas.width / 2, 550);
                 }
             } else {
                 // Rebind the key
@@ -217,21 +230,40 @@ class App {
 
     loadGameData() {
         // Load high score
-        const savedHighScore = localStorage.getItem('highScore');
-        if (savedHighScore) {
-            this.highScore = parseInt(savedHighScore);
+        try {
+            const savedHighScore = localStorage.getItem('highScore');
+            if (savedHighScore) {
+                this.highScore = parseInt(savedHighScore);
+            }
+        } catch (e) {
+            console.warn('Error loading high score, resetting to 0');
+            this.highScore = 0;
         }
 
         // Load leaderboard
-        const savedLeaderboard = localStorage.getItem('leaderboard');
-        if (savedLeaderboard) {
-            this.leaderboard = JSON.parse(savedLeaderboard);
+        try {
+            const savedLeaderboard = localStorage.getItem('leaderboard');
+            if (savedLeaderboard) {
+                this.leaderboard = JSON.parse(savedLeaderboard);
+            }
+        } catch (e) {
+            console.warn('Corrupted leaderboard data, resetting to empty');
+            this.leaderboard = [];
+            try {
+                localStorage.removeItem('leaderboard');
+            } catch (e2) {
+                console.warn('Could not remove corrupted leaderboard data');
+            }
         }
     }
 
     saveGameData() {
-        localStorage.setItem('highScore', this.highScore.toString());
-        localStorage.setItem('leaderboard', JSON.stringify(this.leaderboard));
+        try {
+            localStorage.setItem('highScore', this.highScore.toString());
+            localStorage.setItem('leaderboard', JSON.stringify(this.leaderboard));
+        } catch (e) {
+            console.warn('Could not save game data to localStorage');
+        }
     }
 
     checkHighScore(score) {

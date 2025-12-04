@@ -27,6 +27,7 @@ class Game {
             left: 'KeyA',
             right: 'KeyD',
             shoot: 'Space',
+            warp: 'ShiftLeft',
             remap: 'KeyR'
         };
 
@@ -35,13 +36,18 @@ class Game {
         this.animationId = null; // For stopping the game loop
 
         // Load saved key mappings
-        const savedMappings = localStorage.getItem('keyMappings');
-        if (savedMappings) {
-            this.keyMappings = { ...this.keyMappings, ...JSON.parse(savedMappings) };
+        try {
+            const savedMappings = localStorage.getItem('keyMappings');
+            if (savedMappings) {
+                this.keyMappings = { ...this.keyMappings, ...JSON.parse(savedMappings) };
+            }
+        } catch (e) {
+            console.warn('Corrupted key mappings data, using defaults');
         }
 
         this.init();
         this.setupEventListeners();
+        this.canvas.focus(); // Ensure canvas receives keyboard events
         this.gameLoop();
     }
 
@@ -89,11 +95,9 @@ class Game {
                         case 'miniShips':
                             this.player.powerupEffects.miniShips.duration = duration;
                             this.player.powerupEffects.miniShips.stacks++;
-                            // Determine tier based on stacks
-                            const tier = this.player.powerupEffects.miniShips.stacks >= 3 ? 2 : 1;
                             // Spawn 2 mini ships per pickup
-                            this.miniShips.push(new MiniShip(this.player, tier));
-                            this.miniShips.push(new MiniShip(this.player, tier));
+                            this.miniShips.push(new MiniShip(this.player));
+                            this.miniShips.push(new MiniShip(this.player));
                             // Offset their angles
                             if (this.miniShips.length >= 2) {
                                 this.miniShips[this.miniShips.length - 1].angle = Math.PI;
@@ -115,7 +119,11 @@ class Game {
 
             if (this.isRemapping && this.remapKey) {
                 this.keyMappings[this.remapKey] = e.code;
-                localStorage.setItem('keyMappings', JSON.stringify(this.keyMappings));
+                try {
+                    localStorage.setItem('keyMappings', JSON.stringify(this.keyMappings));
+                } catch (e) {
+                    console.warn('Could not save key mappings');
+                }
                 this.isRemapping = false;
                 this.remapKey = null;
                 console.log('Key remapped:', this.keyMappings);
@@ -130,8 +138,8 @@ class Game {
             this.keys[e.code] = false;
         };
 
-        window.addEventListener('keydown', this.keydownHandler);
-        window.addEventListener('keyup', this.keyupHandler);
+        document.addEventListener('keydown', this.keydownHandler);
+        document.addEventListener('keyup', this.keyupHandler);
     }
 
     startRemapping() {
@@ -166,6 +174,25 @@ class Game {
         this.enemies.forEach(enemy => {
             enemy.update(this.player, this.width, this.height);
         });
+
+        // Magnet pushback
+        if (this.player.powerupEffects.magnet.duration > 0 && this.player.powerupTiers.magnet >= 2 && this.player.pushbackTimer <= 0) {
+            this.player.pushbackTimer = 300; // 5 seconds
+            const magnetRadius = 100 + (this.player.powerupEffects.magnet.stacks - 1) * 50;
+            // Tier 3: stronger repulsion
+            const pushDist = this.player.powerupTiers.magnet === 3 ? 60 : 30;
+            this.enemies.forEach(enemy => {
+                const dx = enemy.x - this.player.x;
+                const dy = enemy.y - this.player.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < magnetRadius) {
+                    const dirX = dx / dist;
+                    const dirY = dy / dist;
+                    enemy.x += dirX * pushDist;
+                    enemy.y += dirY * pushDist;
+                }
+            });
+        }
 
         // Update projectiles
         this.projectiles.forEach(projectile => {
@@ -224,29 +251,9 @@ class Game {
             const dy = this.player.y - enemy.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist < this.player.size + enemy.size) {
-                // Player hit
-                this.lives--;
-                if (this.lives <= 0) {
-                    // Game over - trigger death screen
-                    this.gameOver = true;
-                }
-                // Mark enemy for removal
-                enemiesToRemove.push(enemy);
-            }
-        });
-
-        // Projectiles vs enemies
-        this.projectiles.forEach(projectile => {
-            this.enemies.forEach(enemy => {
-                const dx = projectile.x - enemy.x;
-                const dy = projectile.y - enemy.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < projectile.size + enemy.size) {
-                    // Hit - damage enemy
+                if (this.player.powerupTiers.speedBoost === 3) {
+                    // Tier 3: destroy enemy on contact, no damage to player
                     enemy.takeDamage();
-                    // Mark projectile for removal
-                    projectilesToRemove.push(projectile);
-
                     if (enemy.currentHealth <= 0) {
                         // Enemy destroyed
                         this.score += enemy.points;
@@ -270,8 +277,146 @@ class Game {
                             this.powerups.push(new Powerup(enemy.x, enemy.y));
                         }
                     }
+                } else {
+                    // Normal collision: player takes damage
+                    this.lives--;
+                    if (this.lives <= 0) {
+                        // Game over - trigger death screen
+                        this.gameOver = true;
+                    }
+                    // Mark enemy for removal
+                    enemiesToRemove.push(enemy);
+                }
+            }
+        });
+
+        // Projectiles vs enemies
+        this.projectiles.forEach(projectile => {
+            this.enemies.forEach(enemy => {
+                const dx = projectile.x - enemy.x;
+                const dy = projectile.y - enemy.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < projectile.size + enemy.size) {
+                    // Hit - damage enemy
+                    enemy.takeDamage();
+
+                    if (enemy.currentHealth <= 0) {
+                        // Enemy destroyed
+                        this.score += enemy.points;
+                        this.totalKills++;
+                        // Mark enemy for removal
+                        enemiesToRemove.push(enemy);
+
+                        // Life gain every 10 kills
+                        if (this.totalKills % 10 === 0) {
+                            this.lives++;
+                        }
+
+                        // Extend active powerup durations
+                        this.extendPowerupDurations();
+
+                        // Create scaled explosion particles
+                        this.createExplosion(enemy.x, enemy.y, enemy.color, enemy.type);
+
+                        // Chance to spawn powerup
+                        if (Math.random() < 0.2) {
+                            this.powerups.push(new Powerup(enemy.x, enemy.y));
+                        }
+
+                        // Tier 3 multiShot: projectile bouncing
+                        if (projectile.bouncesRemaining > 0) {
+                            // Find nearest other enemy to bounce to
+                            let nearestEnemy = null;
+                            let minDist = Infinity;
+                            this.enemies.forEach(otherEnemy => {
+                                if (otherEnemy !== enemy && !enemiesToRemove.includes(otherEnemy)) {
+                                    const dx2 = projectile.x - otherEnemy.x;
+                                    const dy2 = projectile.y - otherEnemy.y;
+                                    const dist2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+                                    if (dist2 < minDist) {
+                                        minDist = dist2;
+                                        nearestEnemy = otherEnemy;
+                                    }
+                                }
+                            });
+
+                            if (nearestEnemy) {
+                                // Redirect projectile to new enemy
+                                const dx2 = nearestEnemy.x - projectile.x;
+                                const dy2 = nearestEnemy.y - projectile.y;
+                                const newAngle = Math.atan2(dy2, dx2);
+                                const speed = Math.sqrt(projectile.vx * projectile.vx + projectile.vy * projectile.vy);
+                                projectile.vx = Math.cos(newAngle) * speed;
+                                projectile.vy = Math.sin(newAngle) * speed;
+                                projectile.bouncesRemaining--;
+                                // Don't remove projectile - it continues
+                                return;
+                            }
+                        }
+                    }
+
+                    // Remove projectile if no bounce occurred
+                    if (!projectilesToRemove.includes(projectile)) {
+                        projectilesToRemove.push(projectile);
+                    }
                 }
             });
+        });
+
+        // Beam vs enemies
+        if (this.player.beamData && this.player.beamData.length > 0) {
+            this.player.beamData.forEach(beam => {
+                this.enemies.forEach(enemy => {
+                    const dx = enemy.x - this.player.x;
+                    const dy = enemy.y - this.player.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist <= beam.length) {
+                        const angleToEnemy = Math.atan2(dy, dx);
+                        const angleDiff = Math.abs(angleToEnemy - beam.angle);
+                        const normalizedDiff = Math.min(angleDiff, 2 * Math.PI - angleDiff);
+                        if (normalizedDiff < 0.2) { // angle tolerance
+                            enemy.takeDamage();
+                            if (enemy.currentHealth <= 0) {
+                                this.score += enemy.points;
+                                this.totalKills++;
+                                enemiesToRemove.push(enemy);
+                                if (this.totalKills % 10 === 0) this.lives++;
+                                this.extendPowerupDurations();
+                                this.createExplosion(enemy.x, enemy.y, enemy.color, enemy.type);
+                                if (Math.random() < 0.2) this.powerups.push(new Powerup(enemy.x, enemy.y));
+                            }
+                        }
+                    }
+                });
+            });
+        }
+
+        // Mini-ship beams vs enemies
+        this.miniShips.forEach(miniShip => {
+            if (miniShip.beamData) {
+                this.enemies.forEach(enemy => {
+                    const dx = enemy.x - miniShip.x;
+                    const dy = enemy.y - miniShip.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist <= miniShip.beamData.length) {
+                        const angleToEnemy = Math.atan2(dy, dx);
+                        const angleDiff = Math.abs(angleToEnemy - miniShip.beamData.angle);
+                        const normalizedDiff = Math.min(angleDiff, 2 * Math.PI - angleDiff);
+                        if (normalizedDiff < 0.2) { // angle tolerance
+                            enemy.takeDamage();
+                            if (enemy.currentHealth <= 0) {
+                                this.score += enemy.points;
+                                this.totalKills++;
+                                enemiesToRemove.push(enemy);
+                                if (this.totalKills % 10 === 0) this.lives++;
+                                this.extendPowerupDurations();
+                                this.createExplosion(enemy.x, enemy.y, enemy.color, enemy.type);
+                                if (Math.random() < 0.2) this.powerups.push(new Powerup(enemy.x, enemy.y));
+                            }
+                        }
+                    }
+                });
+            }
         });
 
         // Remove collected items
@@ -391,11 +536,11 @@ class Game {
     cleanup() {
         // Remove event listeners
         if (this.keydownHandler) {
-            window.removeEventListener('keydown', this.keydownHandler);
+            document.removeEventListener('keydown', this.keydownHandler);
             this.keydownHandler = null;
         }
         if (this.keyupHandler) {
-            window.removeEventListener('keyup', this.keyupHandler);
+            document.removeEventListener('keyup', this.keyupHandler);
             this.keyupHandler = null;
         }
     }

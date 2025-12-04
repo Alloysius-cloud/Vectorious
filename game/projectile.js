@@ -1,16 +1,17 @@
 class Projectile {
-    constructor(x, y, angle, rainbow = false, rangeMultiplier = 1, type = 'player') {
+    constructor(x, y, angle, rainbow = false, rangeMultiplier = 1, type = 'player', sizeMultiplier = 1, bouncesRemaining = 0) {
         this.x = x;
         this.y = y;
         const baseSpeed = type === 'miniShip' ? 4 : 5; // mini-ships slightly slower
         this.vx = Math.cos(angle) * baseSpeed;
         this.vy = Math.sin(angle) * baseSpeed;
-        this.size = type === 'miniShip' ? 4 : 3; // mini-ship projectiles larger
+        this.size = (type === 'miniShip' ? 4 : 3) * sizeMultiplier; // mini-ship projectiles larger
         this.baseLifetime = type === 'miniShip' ? 100 : 120; // mini-ship projectiles shorter range
         this.lifetime = Math.floor(this.baseLifetime * rangeMultiplier); // extended by rapid fire
         this.rainbow = rainbow;
         this.type = type;
         this.creationTime = Date.now();
+        this.bouncesRemaining = bouncesRemaining;
     }
 
     update(width, height) {

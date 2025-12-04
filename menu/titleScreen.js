@@ -35,22 +35,14 @@ class TitleScreen extends MenuManager {
         this.ctx.fillText(`High Score: ${this.app.highScore}`, this.canvas.width / 2, this.canvas.height / 2 - 80);
 
         // Draw buttons
-        this.buttons.forEach(button => this.drawButton(button));
+        this.buttons.forEach((button, index) => this.drawButton(button, index === this.selectedButtonIndex));
 
-        // Draw debug key hints
+        // Draw navigation hints
         this.ctx.font = '14px Arial';
         this.ctx.fillStyle = '#888';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText('Use mouse or number keys (1-4) for quick navigation', this.canvas.width / 2, this.canvas.height - 30);
+        this.ctx.fillText('Use mouse or arrow keys and enter for navigation', this.canvas.width / 2, this.canvas.height - 30);
     }
 
-    handleKeyDown(e) {
-        // Number key shortcuts
-        if (e.key >= '1' && e.key <= '4') {
-            const buttonIndex = parseInt(e.key) - 1;
-            if (this.buttons[buttonIndex]) {
-                this.buttons[buttonIndex].action();
-            }
-        }
-    }
+
 }

@@ -5,7 +5,7 @@ class MenuManager {
         this.ctx = ctx;
         this.app = app;
         this.buttons = [];
-        this.selectedButton = 0;
+        this.selectedButtonIndex = 0;
     }
 
     // Shared button creation and management
@@ -70,13 +70,28 @@ class MenuManager {
 
     // Handle keyboard navigation
     handleKeyDown(e) {
-        // Override in subclasses as needed
+        if (e.code === 'ArrowUp') {
+            e.preventDefault();
+            this.selectedButtonIndex = Math.max(0, this.selectedButtonIndex - 1);
+        } else if (e.code === 'ArrowDown') {
+            e.preventDefault();
+            this.selectedButtonIndex = Math.min(this.buttons.length - 1, this.selectedButtonIndex + 1);
+        } else if (e.code === 'Enter') {
+            e.preventDefault();
+            if (this.buttons[this.selectedButtonIndex]) {
+                this.buttons[this.selectedButtonIndex].action();
+            }
+        }
+        // Subclasses can override for additional handling
     }
 
     // Setup event listeners
     setupEventListeners() {
         this.mouseMoveHandler = (e) => this.handleMouseMove(e);
         this.clickHandler = (e) => this.handleClick(e);
+        if (this.keyDownHandler) {
+            document.removeEventListener('keydown', this.keyDownHandler);
+        }
         this.keyDownHandler = (e) => this.handleKeyDown(e);
 
         this.canvas.addEventListener('mousemove', this.mouseMoveHandler);
@@ -88,12 +103,15 @@ class MenuManager {
     cleanupEventListeners() {
         if (this.mouseMoveHandler) {
             this.canvas.removeEventListener('mousemove', this.mouseMoveHandler);
+            this.mouseMoveHandler = null;
         }
         if (this.clickHandler) {
             this.canvas.removeEventListener('click', this.clickHandler);
+            this.clickHandler = null;
         }
         if (this.keyDownHandler) {
             document.removeEventListener('keydown', this.keyDownHandler);
+            this.keyDownHandler = null;
         }
     }
 
