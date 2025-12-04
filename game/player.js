@@ -19,6 +19,15 @@ class Player {
             miniShips: { duration: 0, stacks: 0 },
             magnet: { duration: 0, stacks: 0 }
         };
+        this.powerupTiers = {
+            rapidFire: 1,
+            speedBoost: 1,
+            multiShot: 1,
+            miniShips: 1,
+            magnet: 1
+        };
+        this.beamData = [];
+        this.pushbackTimer = 0;
     }
 
     update(keys, keyMappings, width, height) {
@@ -36,6 +45,16 @@ class Player {
         // Apply effects
         this.speed = this.baseSpeed * (this.powerupEffects.speedBoost.duration > 0 ? 2 : 1);
         this.shootRate = this.baseShootRate * (this.powerupEffects.rapidFire.duration > 0 ? 0.5 : 1);
+
+        // Update tiers
+        this.powerupTiers.rapidFire = this.powerupEffects.rapidFire.stacks >= 10 ? 3 : this.powerupEffects.rapidFire.stacks >= 5 ? 2 : 1;
+        this.powerupTiers.speedBoost = this.powerupEffects.speedBoost.stacks >= 10 ? 3 : this.powerupEffects.speedBoost.stacks >= 5 ? 2 : 1;
+        this.powerupTiers.multiShot = this.powerupEffects.multiShot.stacks >= 10 ? 3 : this.powerupEffects.multiShot.stacks >= 5 ? 2 : 1;
+        this.powerupTiers.miniShips = this.powerupEffects.miniShips.stacks >= 10 ? 3 : this.powerupEffects.miniShips.stacks >= 5 ? 2 : 1;
+        this.powerupTiers.magnet = this.powerupEffects.magnet.stacks >= 10 ? 3 : this.powerupEffects.magnet.stacks >= 5 ? 2 : 1;
+
+        // Update pushback timer
+        if (this.pushbackTimer > 0) this.pushbackTimer--;
 
         // Handle input
         if (keys[keyMappings.up]) {
@@ -70,6 +89,17 @@ class Player {
             this.angle = Math.atan2(this.vy, this.vx);
         }
 
+        // Warp ability
+        if (keys[keyMappings.warp] && this.powerupTiers.speedBoost === 2) {
+            this.x += this.vx * 25; // Skip ahead (adjusted for visibility)
+            this.y += this.vy * 25;
+            // Screen wrapping
+            if (this.x < 0) this.x = width;
+            if (this.x > width) this.x = 0;
+            if (this.y < 0) this.y = height;
+            if (this.y > height) this.y = 0;
+        }
+
         // Shooting
         if (this.shootCooldown > 0) this.shootCooldown--;
     }
@@ -85,6 +115,30 @@ class Player {
                           this.powerupEffects.multiShot.duration > 0 ||
                           this.powerupEffects.miniShips.duration > 0;
 
+        // Check for beam weapon (tier 2+ rapid fire)
+        if (this.powerupTiers.rapidFire >= 2) {
+            // Calculate beam count based on multiShot stacks
+            const multiShotStacks = this.powerupEffects.multiShot.stacks;
+            const beamCount = multiShotStacks > 0 ? Math.min(1 + multiShotStacks + 1, 5) : 1;
+
+            // Tier 3: thicker beams and double range
+            const beamLength = this.powerupTiers.rapidFire === 3 ? 400 : 200;
+
+            this.beamData = [];
+            const spreadAngle = 0.3; // base spread for multi-beams
+
+            for (let i = 0; i < beamCount; i++) {
+                let angle = this.angle;
+                if (beamCount > 1) {
+                    // Spread beams evenly
+                    const spread = (spreadAngle * 2) / (beamCount - 1);
+                    angle = this.angle - spreadAngle + (spread * i);
+                }
+                this.beamData.push({ angle: angle, length: beamLength });
+            }
+            return [];
+        }
+
         // Calculate rapid fire range multiplier (1 + 0.5 * stacks, max 3)
         const rapidFireStacks = this.powerupEffects.rapidFire.stacks;
         const rangeMultiplier = Math.min(1 + 0.5 * rapidFireStacks, 3);
@@ -92,6 +146,9 @@ class Player {
         // Calculate multi-shot projectile count
         const multiShotStacks = this.powerupEffects.multiShot.stacks;
         const projectileCount = multiShotStacks > 0 ? Math.min(1 + multiShotStacks + 1, 5) : 1;
+
+        // Size multiplier for tier 2 multishot
+        const sizeMultiplier = this.powerupTiers.multiShot === 2 ? 2 : 1;
 
         const projectiles = [];
         const spreadAngle = 0.3; // base spread for multi-shot
@@ -103,7 +160,9 @@ class Player {
                 const spread = (spreadAngle * 2) / (projectileCount - 1);
                 angle = this.angle - spreadAngle + (spread * i);
             }
-            projectiles.push(new Projectile(this.x, this.y, angle, hasPowerup, rangeMultiplier));
+            // Add bounce count for tier 3 multiShot
+            const bounceCount = this.powerupTiers.multiShot === 3 ? 1 : 0;
+            projectiles.push(new Projectile(this.x, this.y, angle, hasPowerup, rangeMultiplier, 'player', sizeMultiplier, bounceCount));
         }
 
         return projectiles;
@@ -136,32 +195,94 @@ class Player {
         ctx.translate(this.x, this.y);
         ctx.rotate(this.angle);
 
-        // Draw triangle
-        ctx.strokeStyle = '#0f0';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(this.size, 0);
-        ctx.lineTo(-this.size / 2, -this.size / 2);
-        ctx.lineTo(-this.size / 2, this.size / 2);
-        ctx.closePath();
-        ctx.stroke();
+        if (this.powerupTiers.speedBoost === 3) {
+            // Tier 3: pulsing glowing diamond
+            const pulse = (Math.sin(Date.now() / 200) + 1) / 2; // 0 to 1 pulsing
+            const glowSize = this.size * (1 + pulse * 0.5);
+
+            // Outer glow
+            ctx.shadowColor = '#fff';
+            ctx.shadowBlur = 10 + pulse * 5;
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(glowSize, 0);
+            ctx.lineTo(0, -glowSize);
+            ctx.lineTo(-glowSize, 0);
+            ctx.lineTo(0, glowSize);
+            ctx.closePath();
+            ctx.stroke();
+
+            // Inner diamond
+            ctx.shadowBlur = 0;
+            const hue = (Date.now() / 10) % 360; // Rainbow cycling
+            ctx.strokeStyle = `hsl(${hue}, 100%, 70%)`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(this.size, 0);
+            ctx.lineTo(0, -this.size);
+            ctx.lineTo(-this.size, 0);
+            ctx.lineTo(0, this.size);
+            ctx.closePath();
+            ctx.stroke();
+        } else {
+            // Normal triangle
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(this.size, 0);
+            ctx.lineTo(-this.size / 2, -this.size / 2);
+            ctx.lineTo(-this.size / 2, this.size / 2);
+            ctx.closePath();
+            ctx.stroke();
+        }
 
         ctx.restore();
+
+        // Draw beams if active
+        if (this.beamData && this.beamData.length > 0) {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.strokeStyle = '#ff0'; // yellow beam
+            // Tier 3: thicker beams
+            ctx.lineWidth = this.powerupTiers.rapidFire === 3 ? 8 : 4;
+            this.beamData.forEach(beam => {
+                ctx.save();
+                ctx.rotate(beam.angle);
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(beam.length, 0);
+                ctx.stroke();
+                ctx.restore();
+            });
+            ctx.restore();
+            this.beamData = []; // Reset after drawing
+        }
     }
 }
 
 class MiniShip {
-    constructor(player, tier = 1) {
+    constructor(player) {
         this.player = player;
-        this.tier = tier;
+        this.tier = 1;
         this.angle = 0;
-        this.radius = tier === 2 ? 60 : 50; // larger ships orbit farther
-        this.size = tier === 2 ? 12 : 8; // larger ships are bigger
+        this.radius = 50;
+        this.size = 8;
         this.shootCooldown = 0;
-        this.shootRate = tier === 2 ? 20 : 15; // tier 2 shoots slower
+        this.shootRate = 15;
+        this.beamData = null;
     }
 
     update(enemies, projectiles) {
+        // Update tier dynamically
+        this.tier = this.player.powerupTiers.miniShips;
+        this.radius = this.tier === 2 ? 60 : 50;
+        this.size = this.tier === 2 ? 12 : 8;
+        this.shootRate = this.tier === 2 ? 20 : 15;
+        // Tier 3: enhanced beam properties
+        this.beamLength = this.tier === 3 ? 200 : 100;
+        this.beamWidth = this.tier === 3 ? 4 : 2;
+
         // Orbit around player
         this.angle += 0.05; // rotation speed
         this.x = this.player.x + Math.cos(this.angle) * this.radius;
@@ -188,12 +309,9 @@ class MiniShip {
                 const dy = nearestEnemy.y - this.y;
                 const baseAngle = Math.atan2(dy, dx);
 
-                if (this.tier === 2) {
-                    // Tier 2: multi-shot (3 projectiles)
-                    const spread = 0.3; // radians
-                    projectiles.push(new Projectile(this.x, this.y, baseAngle - spread, false, 1, 'miniShip'));
-                    projectiles.push(new Projectile(this.x, this.y, baseAngle, false, 1, 'miniShip'));
-                    projectiles.push(new Projectile(this.x, this.y, baseAngle + spread, false, 1, 'miniShip'));
+                if (this.tier >= 2) {
+                    // Tier 2+: beam weapon
+                    this.beamData = { angle: baseAngle, length: this.beamLength };
                 } else {
                     // Tier 1: single shot
                     projectiles.push(new Projectile(this.x, this.y, baseAngle, false, 1, 'miniShip'));
@@ -207,15 +325,36 @@ class MiniShip {
         ctx.save();
         ctx.translate(this.x, this.y);
 
-        // Draw small triangle
-        ctx.strokeStyle = '#0ff';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(this.size, 0);
-        ctx.lineTo(-this.size / 2, -this.size / 2);
-        ctx.lineTo(-this.size / 2, this.size / 2);
-        ctx.closePath();
-        ctx.stroke();
+        if (this.tier === 2) {
+            // Tier 2: rainbow circle
+            const hue = (Date.now() / 2) % 360; // Cycle hue over time
+            ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.size, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            // Tier 1: small triangle
+            ctx.strokeStyle = '#0ff';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(this.size, 0);
+            ctx.lineTo(-this.size / 2, -this.size / 2);
+            ctx.lineTo(-this.size / 2, this.size / 2);
+            ctx.closePath();
+            ctx.stroke();
+        }
+
+        // Draw beam if active
+        if (this.beamData) {
+            ctx.rotate(this.beamData.angle);
+            ctx.strokeStyle = '#0ff'; // cyan beam
+            ctx.lineWidth = this.beamWidth;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(this.beamData.length, 0);
+            ctx.stroke();
+            this.beamData = null; // Reset after drawing
+        }
 
         ctx.restore();
     }

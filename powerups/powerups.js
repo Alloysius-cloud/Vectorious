@@ -60,10 +60,10 @@ class Powerup {
                 player.powerupEffects.miniShips.duration = duration;
                 player.powerupEffects.miniShips.stacks++;
                 // Determine tier based on stacks
-                const tier = player.powerupEffects.miniShips.stacks >= 3 ? 2 : 1;
+                const tier = player.powerupEffects.miniShips.stacks >= 5 ? 2 : 1;
                 // Spawn 2 mini ships per pickup
-                miniShips.push(new MiniShip(player, tier));
-                miniShips.push(new MiniShip(player, tier));
+                miniShips.push(new MiniShip(player));
+                miniShips.push(new MiniShip(player));
                 // Offset their angles
                 if (miniShips.length >= 2) {
                     miniShips[miniShips.length - 1].angle = Math.PI;
