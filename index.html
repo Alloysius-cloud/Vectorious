@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vectorious</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        canvas {
+            display: block;
+            background: #000;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <!-- Constants and configuration -->
+    <script src="constants/powerupConstants.js"></script>
+    <script src="config/gameOptions.js"></script>
+
+    <!-- Menu system -->
+    <script src="menu/menuManager.js"></script>
+    <script src="menu/titleScreen.js"></script>
+    <script src="menu/leaderboardScreen.js"></script>
+
+    <!-- Game system -->
+    <script src="game/player.js"></script>
+    <script src="game/enemy.js"></script>
+    <script src="game/projectile.js"></script>
+    <script src="game/particle.js"></script>
+    <script src="game/game.js"></script>
+
+    <!-- Powerups -->
+    <script src="powerups/powerups.js"></script>
+
+    <!-- Main application -->
+    <script src="main.js"></script>
+</body>
+</html>
