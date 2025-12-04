@@ -78,7 +78,28 @@ class Powerup {
     }
 
     render(ctx) {
+        // Pulsing glow effect using layered rendering
+        const pulse = (Math.sin(Date.now() / 300) + 1) / 2; // 0 to 1 pulsing
+
+        // Outer glow layer
+        ctx.globalAlpha = 0.5;
         ctx.fillStyle = this.color;
-        ctx.fillRect(this.x - this.size / 2, this.y - this.size / 2, this.size, this.size);
+        ctx.fillRect(this.x - this.size / 2 - 3, this.y - this.size / 2 - 3, this.size + 6, this.size + 6);
+
+        // Middle glow layer
+        ctx.globalAlpha = 0.7;
+        ctx.fillRect(this.x - this.size / 2 - 2, this.y - this.size / 2 - 2, this.size + 4, this.size + 4);
+
+        // Inner pulsing core
+        ctx.globalAlpha = 1;
+        const coreSize = this.size * (0.8 + pulse * 0.4); // Size pulses
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x - coreSize / 2, this.y - coreSize / 2, coreSize, coreSize);
+
+        // Bright center dot
+        ctx.fillStyle = '#fff';
+        ctx.globalAlpha = pulse * 0.8;
+        ctx.fillRect(this.x - 2, this.y - 2, 4, 4);
+        ctx.globalAlpha = 1;
     }
 }

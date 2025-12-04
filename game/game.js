@@ -7,11 +7,13 @@ class Game {
         this.onGameOver = onGameOver;
 
         this.player = null;
-        this.enemies = [];
+        this.enemySpawner = null;
+        this.enemies = []; // Will be managed by enemySpawner
         this.projectiles = [];
         this.particles = [];
         this.powerups = [];
         this.miniShips = [];
+        this.powerupTexts = []; // Text notifications for collected powerups
 
         this.score = 0;
         this.lives = settings.startingLives;
@@ -54,6 +56,10 @@ class Game {
     init() {
         // Initialize game objects
         this.player = new Player(this.width / 2, this.height / 2);
+        this.enemySpawner = new EnemySpawner(this.width, this.height);
+        this.enemySpawner.setPlayer(this.player);
+        this.enemySpawner.setMaxEnemies(this.maxEnemies);
+        this.enemySpawner.startGame();
     }
 
     setupEventListeners() {
@@ -165,15 +171,9 @@ class Game {
             }
         }
 
-        // Spawn enemies (limit to maxEnemies)
-        if (this.enemies.length < this.maxEnemies && Math.random() < 0.02) {
-            this.enemies.push(new Enemy(this.width, this.height));
-        }
-
-        // Update enemies
-        this.enemies.forEach(enemy => {
-            enemy.update(this.player, this.width, this.height);
-        });
+        // Update enemy spawner (handles spawning and updating enemies)
+        this.enemySpawner.update();
+        this.enemies = this.enemySpawner.getEnemies(); // Get current enemy list
 
         // Magnet pushback
         if (this.player.powerupEffects.magnet.duration > 0 && this.player.powerupTiers.magnet >= 2 && this.player.pushbackTimer <= 0) {
@@ -237,6 +237,13 @@ class Game {
             miniShip.update(this.enemies, this.projectiles);
         });
 
+        // Update powerup texts
+        this.powerupTexts = this.powerupTexts.filter(text => {
+            text.lifetime--;
+            text.y -= 0.5; // Float upward
+            return text.lifetime > 0;
+        });
+
         // Collision detection
         this.checkCollisions();
     }
@@ -276,6 +283,9 @@ class Game {
                         if (Math.random() < 0.2) {
                             this.powerups.push(new Powerup(enemy.x, enemy.y));
                         }
+
+                        // Notify spawner of first enemy death for mega square unlock
+                        this.enemySpawner.recordFirstEnemyDeath();
                     }
                 } else {
                     // Normal collision: player takes damage
@@ -443,6 +453,17 @@ class Game {
             if (dist < this.player.size + powerup.size) {
                 // Collect powerup
                 powerup.applyEffect(this.player, this.miniShips);
+
+                // Add powerup text notification
+                const powerupName = this.getPowerupDisplayName(powerup.type);
+                this.powerupTexts.push({
+                    text: powerupName,
+                    x: this.player.x,
+                    y: this.player.y - 40,
+                    lifetime: 120, // 2 seconds at 60fps
+                    color: powerup.color
+                });
+
                 this.powerups = this.powerups.filter(p => p !== powerup);
             }
         });
@@ -468,10 +489,19 @@ class Game {
         }
     }
 
+    getPowerupDisplayName(powerupType) {
+        const names = {
+            rapidFire: 'RAPID FIRE',
+            speedBoost: 'SPEED BOOST',
+            multiShot: 'MULTI SHOT',
+            miniShips: 'MINI SHIPS',
+            magnet: 'MAGNET'
+        };
+        return names[powerupType] || 'POWERUP';
+    }
+
     createExplosion(x, y, color, enemyType) {
-        let particleCount = 10; // default for circle
-        if (enemyType === 'square') particleCount = 20;
-        else if (enemyType === 'hexagon') particleCount = 50;
+        const particleCount = getParticleConfig(enemyType).count;
 
         for (let i = 0; i < particleCount; i++) {
             this.particles.push(new Particle(x, y, color));
@@ -503,6 +533,21 @@ class Game {
         // Render mini ships
         this.miniShips.forEach(miniShip => miniShip.render(this.ctx));
 
+        // Render powerup text notifications
+        this.powerupTexts.forEach(text => {
+            const alpha = Math.min(text.lifetime / 60, 1); // Fade in/out over 1 second
+            this.ctx.save();
+            this.ctx.globalAlpha = alpha;
+            this.ctx.fillStyle = text.color;
+            this.ctx.font = 'bold 16px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.strokeStyle = '#000';
+            this.ctx.lineWidth = 3;
+            this.ctx.strokeText(text.text, text.x, text.y);
+            this.ctx.fillText(text.text, text.x, text.y);
+            this.ctx.restore();
+        });
+
         // Render UI
         this.renderUI();
     }
@@ -528,6 +573,7 @@ class Game {
             this.ctx.fillText(`Score: ${this.score}`, 10, 30);
             this.ctx.fillText(`Lives: ${this.lives}`, 10, 60);
             this.ctx.fillText(`Kills: ${this.totalKills}`, 10, 90);
+            this.ctx.fillText(`Time: ${this.enemySpawner.getGameTimeFormatted()}`, 10, 120);
         }
     }
 
