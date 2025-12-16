@@ -17,16 +17,21 @@ class Player {
             speedBoost: { duration: 0, stacks: 0 },
             multiShot: { duration: 0, stacks: 0 },
             miniShips: { duration: 0, stacks: 0 },
-            magnet: { duration: 0, stacks: 0 }
+            magnet: { duration: 0, stacks: 0 },
+            laserBeam: { duration: 0, stacks: 0 }
         };
         this.powerupTiers = {
             rapidFire: 1,
             speedBoost: 1,
             multiShot: 1,
             miniShips: 1,
-            magnet: 1
+            magnet: 1,
+            laserBeam: 1
         };
         this.beamData = [];
+        this.laserCharge = 0;
+        this.laserChargeTime = 300; // 5 seconds at 60fps
+        this.laserBeamData = null;
         this.pushbackTimer = 0;
     }
 
@@ -100,8 +105,62 @@ class Player {
             if (this.y > height) this.y = 0;
         }
 
+        // Laser beam charging and firing
+        if (this.powerupEffects.laserBeam.duration > 0) {
+            const laserProps = this.getLaserBeamProperties();
+            this.laserChargeTime = laserProps.chargeTime; // Update charge time dynamically
+
+            this.laserCharge++;
+            if (this.laserCharge >= this.laserChargeTime) {
+                // Fire laser beam
+                this.laserBeamData = {
+                    angle: this.angle,
+                    length: laserProps.range,
+                    width: laserProps.width
+                };
+                this.laserCharge = 0;
+            }
+        } else {
+            this.laserCharge = 0; // Reset if powerup expires
+        }
+
         // Shooting
         if (this.shootCooldown > 0) this.shootCooldown--;
+
+        // Update laser beam tier based on stacks
+        this.powerupTiers.laserBeam = this.powerupEffects.laserBeam.stacks >= 5 ? 2 : 1;
+    }
+
+    getLaserBeamProperties() {
+        const stacks = this.powerupEffects.laserBeam.stacks;
+        const tier = this.powerupTiers.laserBeam;
+
+        // Base properties
+        let width = 50;
+        let range = 1000;
+        let chargeTime = 300; // 5 seconds
+
+        if (tier >= 2) {
+            // Tier 2: 50% increase
+            width = 75;
+            range = 1500;
+            chargeTime = 240; // 4 seconds
+        }
+
+        // Additional scaling for stacks beyond 5
+        if (stacks > 5) {
+            const extraStacks = stacks - 5;
+            const scalingMultiplier = 1 + 0.02 * extraStacks; // +2% per extra stack
+            width *= scalingMultiplier;
+            range *= scalingMultiplier;
+            chargeTime /= (1 + 0.05 * extraStacks); // -5% charge time per extra stack
+        }
+
+        return {
+            width: Math.floor(width),
+            range: Math.floor(range),
+            chargeTime: Math.max(60, Math.floor(chargeTime)) // Minimum 1 second
+        };
     }
 
     canShoot() {
@@ -188,6 +247,35 @@ class Player {
             ctx.globalAlpha = 0.5;
             ctx.stroke();
             ctx.globalAlpha = 1;
+            ctx.restore();
+        }
+
+        // Draw laser charging effect
+        if (this.powerupEffects.laserBeam.duration > 0 && this.laserCharge > 0) {
+            const chargeProgress = this.laserCharge / this.laserChargeTime;
+            const laserProps = this.getLaserBeamProperties();
+            const baseRadius = laserProps.width * 0.4; // Scale with beam width
+            const chargeRadius = baseRadius + chargeProgress * (baseRadius * 0.5); // Grow by 50%
+
+            ctx.save();
+            ctx.translate(this.x, this.y);
+
+            // Pulsing green aura
+            const pulse = (Math.sin(Date.now() / 100) + 1) / 2;
+            ctx.globalAlpha = 0.3 + pulse * 0.4;
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(0, 0, chargeRadius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Inner glow
+            ctx.globalAlpha = 0.5;
+            ctx.fillStyle = '#0f0';
+            ctx.beginPath();
+            ctx.arc(0, 0, chargeRadius * 0.8, 0, Math.PI * 2);
+            ctx.fill();
+
             ctx.restore();
         }
 
@@ -281,6 +369,46 @@ class Player {
             });
             ctx.restore();
             this.beamData = []; // Reset after drawing
+        }
+
+        // Draw laser beam if active
+        if (this.laserBeamData) {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.laserBeamData.angle);
+
+            // Pulsing green laser beam
+            const pulse = (Math.sin(Date.now() / 50) + 1) / 2; // Faster pulsing
+
+            // Outer glow layer
+            ctx.globalAlpha = 0.6;
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = this.laserBeamData.width;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(this.laserBeamData.length, 0);
+            ctx.stroke();
+
+            // Inner bright beam
+            ctx.globalAlpha = 0.9;
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = this.laserBeamData.width * 0.6;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(this.laserBeamData.length, 0);
+            ctx.stroke();
+
+            // Core green line
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = Math.max(2, this.laserBeamData.width * 0.2);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(this.laserBeamData.length, 0);
+            ctx.stroke();
+
+            ctx.restore();
+            this.laserBeamData = null; // Reset after drawing
         }
     }
 }
