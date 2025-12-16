@@ -75,7 +75,7 @@ class Game {
 
             // Debug powerup keys (only during gameplay)
             if (!this.gameOver && !this.isRemapping) {
-                const powerupTypes = ['rapidFire', 'speedBoost', 'multiShot', 'miniShips', 'magnet'];
+                const powerupTypes = ['rapidFire', 'speedBoost', 'multiShot', 'miniShips', 'magnet', 'laserBeam'];
                 const keyIndex = parseInt(e.key) - 1;
                 if (keyIndex >= 0 && keyIndex < powerupTypes.length && this.player) {
                     const powerupType = powerupTypes[keyIndex];
@@ -115,6 +115,11 @@ class Game {
                             this.player.powerupEffects.magnet.duration = duration;
                             this.player.powerupEffects.magnet.stacks++;
                             console.log(`Debug: Added Magnet (stacks: ${this.player.powerupEffects.magnet.stacks})`);
+                            break;
+                        case 'laserBeam':
+                            this.player.powerupEffects.laserBeam.duration = duration;
+                            this.player.powerupEffects.laserBeam.stacks++;
+                            console.log(`Debug: Added Laser Beam (stacks: ${this.player.powerupEffects.laserBeam.stacks})`);
                             break;
                     }
                     return; // Don't process as normal key
@@ -441,6 +446,35 @@ class Game {
             }
         });
 
+        // Laser beam vs enemies
+        if (this.player.laserBeamData) {
+            const laserProps = this.player.getLaserBeamProperties();
+            const angleTolerance = 0.5 + (laserProps.width - 50) * 0.01; // Base 0.5 radians, +0.01 per pixel beyond 50px width
+
+            this.enemies.forEach(enemy => {
+                const dx = enemy.x - this.player.x;
+                const dy = enemy.y - this.player.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist <= this.player.laserBeamData.length) {
+                    const angleToEnemy = Math.atan2(dy, dx);
+                    const angleDiff = Math.abs(angleToEnemy - this.player.laserBeamData.angle);
+                    const normalizedDiff = Math.min(angleDiff, 2 * Math.PI - angleDiff);
+                    if (normalizedDiff < angleTolerance) { // dynamic angle tolerance
+                        enemy.takeDamage();
+                        if (enemy.currentHealth <= 0) {
+                            this.score += enemy.points;
+                            this.totalKills++;
+                            enemiesToRemove.push(enemy);
+                            if (this.totalKills % 10 === 0) this.lives++;
+                            this.extendPowerupDurations();
+                            this.createExplosion(enemy.x, enemy.y, enemy.color, enemy.type);
+                            if (Math.random() < 0.2) this.powerups.push(new Powerup(enemy.x, enemy.y));
+                        }
+                    }
+                }
+            });
+        }
+
         // Remove collected items
         this.projectiles = this.projectiles.filter(p => !projectilesToRemove.includes(p));
         this.enemies = this.enemies.filter(e => !enemiesToRemove.includes(e));
@@ -487,6 +521,9 @@ class Game {
         if (this.player.powerupEffects.magnet.duration > 0) {
             this.player.powerupEffects.magnet.duration += extension;
         }
+        if (this.player.powerupEffects.laserBeam.duration > 0) {
+            this.player.powerupEffects.laserBeam.duration += extension;
+        }
     }
 
     getPowerupDisplayName(powerupType) {
@@ -495,7 +532,8 @@ class Game {
             speedBoost: 'SPEED BOOST',
             multiShot: 'MULTI SHOT',
             miniShips: 'MINI SHIPS',
-            magnet: 'MAGNET'
+            magnet: 'MAGNET',
+            laserBeam: 'LASER BEAM'
         };
         return names[powerupType] || 'POWERUP';
     }

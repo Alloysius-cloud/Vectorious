@@ -4,7 +4,8 @@ const POWERUP_TYPES = {
     SPEED_BOOST: 'speedBoost',
     MULTI_SHOT: 'multiShot',
     MINI_SHIPS: 'miniShips',
-    MAGNET: 'magnet'
+    MAGNET: 'magnet',
+    LASER_BEAM: 'laserBeam'
 };
 
 // Powerup configurations
@@ -38,6 +39,12 @@ const POWERUP_CONFIGS = {
         effect: POWERUP_TYPES.MAGNET,
         description: 'Attracts nearby powerups',
         baseDuration: 300
+    },
+    [POWERUP_TYPES.LASER_BEAM]: {
+        color: '#0f0',
+        effect: POWERUP_TYPES.LASER_BEAM,
+        description: 'Charges up a devastating laser beam',
+        baseDuration: 1500 // 25 seconds at 60fps
     }
 };
 

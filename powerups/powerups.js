@@ -7,8 +7,8 @@ class Powerup {
         this.size = 8;
         this.lifetime = 600; // 10 seconds at 60fps
 
-        // Random type
-        const types = ['rapidFire', 'speedBoost', 'multiShot', 'miniShips', 'magnet'];
+        // Random type (weighted for rarity)
+        const types = ['rapidFire', 'rapidFire', 'speedBoost', 'speedBoost', 'multiShot', 'multiShot', 'miniShips', 'miniShips', 'magnet', 'magnet', 'laserBeam'];
         this.type = types[Math.floor(Math.random() * types.length)];
 
         // Colors
@@ -27,6 +27,9 @@ class Powerup {
                 break;
             case 'magnet':
                 this.color = '#f80'; // orange
+                break;
+            case 'laserBeam':
+                this.color = '#0f0'; // green
                 break;
         }
     }
@@ -73,6 +76,10 @@ class Powerup {
             case 'magnet':
                 player.powerupEffects.magnet.duration = duration;
                 player.powerupEffects.magnet.stacks++;
+                break;
+            case 'laserBeam':
+                player.powerupEffects.laserBeam.duration = duration * 5; // 25 seconds
+                player.powerupEffects.laserBeam.stacks++;
                 break;
         }
     }
