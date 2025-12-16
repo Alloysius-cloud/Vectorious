@@ -12,8 +12,9 @@ The game ends when you run out of lives, with scoring based on enemy kills.
 
 ### Enemies
 - **Circles**: Basic enemy (1 hit, 10 points)
-- **Squares**: Armored enemy (2 hits, 20 points)
-- **Hexagons**: Heavy enemy (3 hits, 30 points)
+- **Squares**: Armoured enemy (2 hits, 25 points)
+- **Hexagons**: Heavy enemy (5 hits, 100 points)
+- **Green Mega Squares**: Heavy Armoured enemy (10 hits, 200 points) 
 - Enemies spawn continuously up to a configurable maximum
 - Different explosion particle effects based on enemy type
 
@@ -25,6 +26,7 @@ Powerups spawn randomly (20% chance) when enemies are destroyed and provide temp
 - **Multi-Shot** (Magenta): Fires multiple projectiles simultaneously (stacks)
 - **Mini-Ships** (Red): Spawns companion ships that auto-shoot (stacks, tier upgrades)
 - **Magnet** (Orange): Attracts powerups from a distance (stacks)
+- **Laser Beam** (Green): Automatically fires a death star laser after charging up (stacks, tier upgrades)
 
 ### Scoring & Lives
 - Points awarded based on enemy type destroyed
